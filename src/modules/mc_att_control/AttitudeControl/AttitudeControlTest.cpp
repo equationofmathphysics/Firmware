@@ -39,6 +39,33 @@ using namespace matrix;
 TEST(AttitudeControlTest, AllZeroCase)
 {
 	AttitudeControl attitude_control;
-	matrix::Vector3f rate_setpoint = attitude_control.update(Quatf(), Quatf(), 0.f);
+	Vector3f rate_setpoint = attitude_control.update(Quatf(), Quatf(), 0.f);
 	EXPECT_EQ(rate_setpoint, Vector3f());
+}
+
+TEST(AttitudeControlTest, Convergence)
+{
+	AttitudeControl attitude_control;
+	attitude_control.setProportionalGain(Vector3f(1,1,1));
+	attitude_control.setRateLimit(Vector3f(10000,10000,10000));
+
+	Quatf quat_goal;
+	Quatf quat_state(0.996,0.087,0,0);
+	// Quatf quat_state(0,0,0,1);
+
+	float error = 10.0f;
+
+	int i;
+	for (i = 0; i < 100 || fabsf(error) < 1e-4f; i++) {
+		Vector3f rate_setpoint = attitude_control.update(quat_state, quat_goal, 0.f);
+		rate_setpoint.print();
+		quat_state = quat_state * Quatf(AxisAnglef(rate_setpoint * 0.01f));
+		quat_state.normalize();
+		quat_state.print();
+		const float new_error = Vector<float, 4>(quat_state - quat_goal).norm();
+		EXPECT_LT(new_error, error);
+		error = new_error;
+	}
+
+	EXPECT_LT(i, 100);
 }
